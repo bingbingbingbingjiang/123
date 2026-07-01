@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>学生考勤系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f3f4f6;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .page {
+            display: none;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            z-index: 100;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #10B981, #3B82F6);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 500;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        
+        .btn-primary:active {
+            transform: scale(0.98);
+            opacity: 0.9;
+        }
+        
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 500;
+        }
+        
+        .status-present { color: #10B981; }
+        .status-absent { color: #EF4444; }
+        .status-late { color: #F59E0B; }
+        .status-leave { color: #8B5CF6; }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .animate-slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.5s ease-in-out;
+            transform-origin: 50% 50%;
+        }
+        
+        .qr-scanner {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            margin: 0 auto;
+        }
+        
+        .qr-scanner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px solid rgba(16, 185, 129, 0.3);
+            border-radius: 20px;
+        }
+        
+        .qr-scanner::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent, #10B981, transparent);
+            animation: scan 2s linear infinite;
+            transform: translateX(-50%);
+        }
+        
+        @keyframes scan {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        
+        .corner {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-color: #10B981;
+            border-style: solid;
+            border-width: 3px;
+        }
+        
+        .corner-tl { top: 0; left: 0; border-right: none; border-bottom: none; }
+        .corner-tr { top: 0; right: 0; border-left: none; border-bottom: none; }
+        .corner-bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+        .corner-br { bottom: 0; right: 0; border-left: none; border-top: none; }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #10B981;
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="min-h-screen bg-gray-50">
+        <div id="page-login" class="page active flex items-center justify-center p-4">
+            <div class="w-full max-w-md animate-fade-in">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i class="fa-solid fa-graduation-cap text-white text-3xl"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-800">学生考勤系统</h1>
+                    <p class="text-gray-500 mt-2">轻松管理考勤，高效记录出勤</p>
+                </div>
+                
+                <div class="card">
+                    <div class="flex mb-6">
+                        <button onclick="switchTab('login')" id="tab-login" class="flex-1 py-2 text-center font-medium text-emerald-600 border-b-2 border-emerald-500">登录</button>
+                        <button onclick="switchTab('register')" id="tab-register" class="flex-1 py-2 text-center font-medium text-gray-500 border-b-2 border-transparent">注册</button>
+                    </div>
+                    
+                    <form id="login-form" onsubmit="handleLogin(event)">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">手机号</label>
+                            <input type="tel" id="login-phone" placeholder="请输入手机号" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl transition-colors" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+                            <input type="password" id="login-password" placeholder="请输入密码" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl transition-colors" required>
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">角色</label>
+                            <select id="login-role" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl transition-colors">
+                                <option value="student">学生</option>
+                                <option value="teacher">教师</option>
+                                <option value="admin">管理员</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary w-full">登录</button>
+                    </form>
+                    
+                    <form id="register-form" onsubmit="handleRegister(event)" class="hidden">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+                            <input type="text" id="register-name" placeholder="请输入姓名" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl transition-colors" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">手机号</label>
+                            <input type="tel" id="register-phone" placeholder="请输入手机号" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl transition-colors" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+                            <input type="password" id="register-password" placeholder="请输入密码" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl transition-colors" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">学号/工号</label>
+                            <input type="text" id="register-id" placeholder="请输入学号或工号" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl transition-colors" required>
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">角色</label>
+                            <select id="register-role" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl transition-colors">
+                                <option value="student">学生</option>
+                                <option value="teacher">教师</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary w-full">注册</button>
+                    </form>
+                </div>
+                
+                <div class="text-center mt-6 text-gray-400 text-sm">
+                    <p>演示账号：</p>
+                    <p>学生：13800138001 / 123456</p>
+                    <p>教师：13800138002 / 123456</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="page-home" class="page">
+            <header class="bg-gradient-to-r from-emerald-500 to-blue-500 text-white p-4 pb-20 rounded-b-3xl shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90" id="current-date">2026年7月1日 星期二</p>
+                        <h1 class="text-xl font-bold mt-1">欢迎回来</h1>
+                    </div>
+                    <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-user text-lg"></i>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="px-4 -mt-12 space-y-4">
+                <div class="card flex items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="relative">
+                            <svg class="w-20 h-20 progress-ring">
+                                <circle class="text-gray-100" stroke-width="8" stroke="currentColor" fill="transparent" r="36" cx="40" cy="40"/>
+                                <circle class="text-emerald-500 progress-ring__circle" stroke-width="8" stroke-linecap="round" stroke="currentColor" fill="transparent" r="36" cx="40" cy="40" stroke-dasharray="226" stroke-dashoffset="45"/>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span class="text-xl font-bold text-gray-800">80%</span>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-gray-500 text-sm">本月出勤率</p>
+                            <div class="flex items-center gap-4 mt-2">
+                                <span class="text-sm"><i class="fa-solid fa-check-circle text-emerald-500"></i> 16天</span>
+                                <span class="text-sm"><i class="fa-solid fa-x-circle text-red-400"></i> 4天</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="font-bold text-gray-800">今日课程</h2>
+                        <button onclick="navigateTo('courses')" class="text-sm text-emerald-600">查看全部</button>
+                    </div>
+                    <div id="today-courses" class="space-y-3">
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="font-bold text-gray-800">最近考勤</h2>
+                        <button onclick="navigateTo('attendance')" class="text-sm text-emerald-600">查看全部</button>
+                    </div>
+                    <div id="recent-attendance" class="space-y-2">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="page-attendance" class="page">
+            <header class="bg-white p-4 shadow-sm sticky top-0 z-10">
+                <h1 class="text-lg font-bold text-gray-800">考勤记录</h1>
+                <div class="flex gap-2 mt-3 overflow-x-auto scrollbar-hide">
+                    <button class="px-4 py-2 bg-emerald-500 text-white rounded-full text-sm whitespace-nowrap">全部</button>
+                    <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm whitespace-nowrap">本周</button>
+                    <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm whitespace-nowrap">本月</button>
+                    <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm whitespace-nowrap">缺勤</button>
+                    <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm whitespace-nowrap">请假</button>
+                </div>
+            </header>
+            
+            <div class="px-4 py-4">
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="card text-center">
+                        <p class="text-gray-500 text-sm">出勤</p>
+                        <p class="text-2xl font-bold text-emerald-500 mt-1">16</p>
+                    </div>
+                    <div class="card text-center">
+                        <p class="text-gray-500 text-sm">缺勤</p>
+                        <p class="text-2xl font-bold text-red-500 mt-1">4</p>
+                    </div>
+                    <div class="card text-center">
+                        <p class="text-gray-500 text-sm">迟到</p>
+                        <p class="text-2xl font-bold text-amber-500 mt-1">2</p>
+                    </div>
+                    <div class="card text-center">
+                        <p class="text-gray-500 text-sm">请假</p>
+                        <p class="text-2xl font-bold text-purple-500 mt-1">1</p>
+                    </div>
+                </div>
+                
+                <div id="attendance-list" class="space-y-3">
+                </div>
+            </div>
+        </div>
+        
+        <div id="page-signin" class="page">
+            <header class="bg-white p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <button onclick="navigateTo('home')" class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <h1 class="text-lg font-bold text-gray-800">签到</h1>
+                    <div class="w-10"></div>
+                </div>
+            </header>
+            
+            <div class="px-4 py-6">
+                <div class="card text-center">
+                    <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-solid fa-location-dot text-emerald-500 text-2xl"></i>
+                    </div>
+                    <h2 class="font-bold text-gray-800 mb-2">定位签到</h2>
+                    <p class="text-gray-500 text-sm mb-4">请确保您已到达上课地点</p>
+                    <div id="location-info" class="text-sm text-gray-600 mb-4">
+                        <i class="fa-solid fa-spinner fa-spin"></i> 正在获取位置...
+                    </div>
+                    <button onclick="handleSignin()" id="signin-btn" class="btn-primary w-full">立即签到</button>
+                    <p class="text-xs text-gray-400 mt-3">签到时间：08:00 - 08:30</p>
+                </div>
+                
+                <div class="card mt-4">
+                    <h3 class="font-medium text-gray-800 mb-4">二维码签到</h3>
+                    <div class="qr-scanner">
+                        <div class="corner corner-tl"></div>
+                        <div class="corner corner-tr"></div>
+                        <div class="corner corner-bl"></div>
+                        <div class="corner corner-br"></div>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <i class="fa-solid fa-qrcode text-emerald-400 text-4xl"></i>
+                        </div>
+                    </div>
+                    <p class="text-center text-gray-500 text-sm mt-4">请扫描教师出示的二维码</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="page-courses" class="page">
+            <header class="bg-white p-4 shadow-sm sticky top-0 z-10">
+                <div class="flex items-center justify-between">
+                    <h1 class="text-lg font-bold text-gray-800">课程管理</h1>
+                    <button onclick="showAddCourse()" class="btn-primary text-sm px-4 py-2">
+                        <i class="fa-solid fa-plus"></i> 添加课程
+                    </button>
+                </div>
+            </header>
+            
+            <div class="px-4 py-4">
+                <div class="flex gap-2 mb-4 overflow-x-auto scrollbar-hide">
+                    <button class="px-4 py-2 bg-emerald-500 text-white rounded-full text-sm whitespace-nowrap">全部</button>
+                    <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm whitespace-nowrap">周一</button>
+                    <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm whitespace-nowrap">周二</button>
+                    <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm whitespace-nowrap">周三</button>
+                    <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm whitespace-nowrap">周四</button>
+                    <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm whitespace-nowrap">周五</button>
+                </div>
+                
+                <div id="courses-list" class="space-y-3">
+                </div>
+            </div>
+        </div>
+        
+        <div id="page-statistics" class="page">
+            <header class="bg-white p-4 shadow-sm sticky top-0 z-10">
+                <h1 class="text-lg font-bold text-gray-800">统计分析</h1>
+            </header>
+            
+            <div class="px-4 py-4 space-y-4">
+                <div class="card">
+                    <h3 class="font-medium text-gray-800 mb-4">班级出勤统计</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">出勤</span>
+                                <span class="font-medium text-emerald-600">85%</span>
+                            </div>
+                            <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-emerald-500 rounded-full" style="width: 85%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">缺勤</span>
+                                <span class="font-medium text-red-600">10%</span>
+                            </div>
+                            <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-red-500 rounded-full" style="width: 10%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-600">迟到</span>
+                                <span class="font-medium text-amber-600">5%</span>
+                            </div>
+                            <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-amber-500 rounded-full" style="width: 5%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3 class="font-medium text-gray-800 mb-4">考勤趋势</h3>
+                    <div class="flex items-end justify-between h-40 gap-2">
+                        <div class="flex-1 bg-emerald-100 rounded-t-lg" style="height: 80%"></div>
+                        <div class="flex-1 bg-emerald-100 rounded-t-lg" style="height: 90%"></div>
+                        <div class="flex-1 bg-emerald-100 rounded-t-lg" style="height: 70%"></div>
+                        <div class="flex-1 bg-emerald-100 rounded-t-lg" style="height: 95%"></div>
+                        <div class="flex-1 bg-emerald-100 rounded-t-lg" style="height: 85%"></div>
+                        <div class="flex-1 bg-red-100 rounded-t-lg" style="height: 60%"></div>
+                        <div class="flex-1 bg-emerald-100 rounded-t-lg" style="height: 88%"></div>
+                    </div>
+                    <div class="flex justify-between mt-2 text-xs text-gray-500">
+                        <span>周一</span>
+                        <span>周二</span>
+                        <span>周三</span>
+                        <span>周四</span>
+                        <span>周五</span>
+                        <span>周六</span>
+                        <span>周日</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3 class="font-medium text-gray-800 mb-4">课程出勤排行</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center">
+                                <span class="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center text-sm mr-3">1</span>
+                                <div>
+                                    <p class="font-medium text-gray-800">高等数学</p>
+                                    <p class="text-xs text-gray-500">张老师</p>
+                                </div>
+                            </div>
+                            <span class="text-emerald-600 font-bold">98%</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center">
+                                <span class="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm mr-3">2</span>
+                                <div>
+                                    <p class="font-medium text-gray-800">大学英语</p>
+                                    <p class="text-xs text-gray-500">李老师</p>
+                                </div>
+                            </div>
+                            <span class="text-emerald-600 font-bold">95%</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center">
+                                <span class="w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-sm mr-3">3</span>
+                                <div>
+                                    <p class="font-medium text-gray-800">计算机基础</p>
+                                    <p class="text-xs text-gray-500">王老师</p>
+                                </div>
+                            </div>
+                            <span class="text-emerald-600 font-bold">92%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn-secondary w-full flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-download"></i> 导出报表
+                </button>
+            </div>
+        </div>
+        
+        <div id="page-profile" class="page">
+            <header class="bg-gradient-to-br from-emerald-500 to-blue-500 p-6 text-white rounded-b-3xl">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                        <i class="fa-solid fa-user text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold" id="profile-name">张三</h1>
+                        <p class="text-sm opacity-90" id="profile-role">学生</p>
+                        <p class="text-xs opacity-70 mt-1" id="profile-id">学号：2026001</p>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="px-4 py-4 space-y-3">
+                <div class="card">
+                    <button class="w-full flex items-center justify-between p-2">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                                <i class="fa-solid fa-calendar text-emerald-600"></i>
+                            </div>
+                            <span>我的考勤</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                    </button>
+                    <hr class="border-gray-100">
+                    <button class="w-full flex items-center justify-between p-2">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <i class="fa-solid fa-book text-blue-600"></i>
+                            </div>
+                            <span>我的课程</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                    </button>
+                    <hr class="border-gray-100">
+                    <button class="w-full flex items-center justify-between p-2">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                                <i class="fa-solid fa-file-text text-purple-600"></i>
+                            </div>
+                            <span>请假申请</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <button class="w-full flex items-center justify-between p-2">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                                <i class="fa-solid fa-bell text-amber-600"></i>
+                            </div>
+                            <span>通知设置</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                    </button>
+                    <hr class="border-gray-100">
+                    <button class="w-full flex items-center justify-between p-2">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                <i class="fa-solid fa-lock text-red-600"></i>
+                            </div>
+                            <span>修改密码</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-gray-400"></i>
+                    </button>
+                </div>
+                
+                <button onclick="handleLogout()" class="btn-secondary w-full">
+                    <i class="fa-solid fa-right-from-bracket"></i> 退出登录
+                </button>
+            </div>
+        </div>
+        
+        <div class="tab-bar">
+            <div class="flex justify-around">
+                <button onclick="navigateTo('home')" class="flex flex-col items-center py-2 px-4 flex-1 tab-btn active">
+                    <i class="fa-solid fa-home text-lg"></i>
+                    <span class="text-xs mt-1">首页</span>
+                </button>
+                <button onclick="navigateTo('attendance')" class="flex flex-col items-center py-2 px-4 flex-1 tab-btn">
+                    <i class="fa-solid fa-clipboard-list text-lg"></i>
+                    <span class="text-xs mt-1">考勤</span>
+                </button>
+                <button onclick="navigateTo('signin')" class="flex flex-col items-center py-2 px-4 flex-1 tab-btn">
+                    <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-full flex items-center justify-center -mt-4 shadow-lg">
+                        <i class="fa-solid fa-qrcode text-white text-lg"></i>
+                    </div>
+                    <span class="text-xs mt-1">签到</span>
+                </button>
+                <button onclick="navigateTo('courses')" class="flex flex-col items-center py-2 px-4 flex-1 tab-btn">
+                    <i class="fa-solid fa-book-open text-lg"></i>
+                    <span class="text-xs mt-1">课程</span>
+                </button>
+                <button onclick="navigateTo('profile')" class="flex flex-col items-center py-2 px-4 flex-1 tab-btn">
+                    <i class="fa-solid fa-user text-lg"></i>
+                    <span class="text-xs mt-1">我的</span>
+                </button>
+            </div>
+        </div>
+        
+        <div id="modal-add-course" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl w-full max-w-md p-6 animate-slide-up">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">添加课程</h3>
+                <form onsubmit="handleAddCourse(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">课程名称</label>
+                        <input type="text" id="course-name" placeholder="请输入课程名称" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">星期</label>
+                            <select id="course-day" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
+                                <option value="1">周一</option>
+                                <option value="2">周二</option>
+                                <option value="3">周三</option>
+                                <option value="4">周四</option>
+                                <option value="5">周五</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">班级</label>
+                            <input type="text" id="course-class" placeholder="请输入班级" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">开始时间</label>
+                            <input type="time" id="course-start" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">结束时间</label>
+                            <input type="time" id="course-end" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">上课地点</label>
+                        <input type="text" id="course-location" placeholder="请输入上课地点" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl" required>
+                    </div>
+                    <div class="flex gap-3">
+                        <button type="button" onclick="closeModal()" class="btn-secondary flex-1">取消</button>
+                        <button type="submit" class="btn-primary flex-1">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div id="modal-success" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+            <div class="bg-white rounded-2xl p-8 text-center animate-fade-in">
+                <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-check text-emerald-500 text-4xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">签到成功</h3>
+                <p class="text-gray-500">您已成功完成本次考勤签到</p>
+                <button onclick="closeSuccessModal()" class="btn-primary mt-6 px-8">确定</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
